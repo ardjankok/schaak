@@ -32,6 +32,9 @@ function openPromotion() {
 boardEl.addEventListener('click', (event) => {
   const squareEl = event.target.closest('[data-square]');
   if (!squareEl) return;
+  // Het menu is al dicht (Esc of terugknop), maar Chrome levert 'close' pas bij het
+  // volgende frame af: dan vervalt de promotie hier, zodat de tik gewoon telt.
+  if (game.pendingPromotion && !promotionDialog.open) game.cancelPromotion();
   if (game.tap(squareEl.dataset.square) === 'promotion') openPromotion();
   render();
 });
@@ -56,8 +59,11 @@ promotionDialog.addEventListener('click', (event) => {
 
 // Esc en de terugknop van Android sluiten het menu zelf; dan gaat de partij gewoon verder.
 // 'cancel' komt meteen; 'close' is het vangnet als de browser 'cancel' overslaat.
+// Een laat 'close' van een eerder menu mag een opnieuw geopend menu niet sluiten.
 promotionDialog.addEventListener('cancel', closePromotion);
-promotionDialog.addEventListener('close', closePromotion);
+promotionDialog.addEventListener('close', () => {
+  if (!promotionDialog.open) closePromotion();
+});
 
 newGameButton.addEventListener('click', () => {
   game.reset();

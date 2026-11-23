@@ -105,6 +105,13 @@ main {
   background-image: radial-gradient(circle closest-side, rgb(255 0 0) 0%, rgb(231 0 0) 30%, rgb(169 0 0 / 0) 100%);
 }
 
+/* Tikken en lang drukken raken het veld of de knop, niet het plaatje. Anders
+   opent Chrome op Android bij lang drukken het menu voor afbeeldingen. */
+.piece,
+.promotion-choices img {
+  pointer-events: none;
+}
+
 .piece {
   display: block;
   width: 100%;
@@ -141,7 +148,8 @@ main {
 
 .panel {
   width: var(--size);
-  height: var(--panel-height);
+  /* min-height: met grotere tekst groeit het paneel naar beneden, niet over het bord. */
+  min-height: var(--panel-height);
   display: flex;
   align-items: center;
   justify-content: center;

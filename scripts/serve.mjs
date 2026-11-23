@@ -32,7 +32,7 @@ export function createDevServer(rootDir) {
       return send(res, 400, 'Ongeldige URL');
     }
     if (urlPath.includes('\0')) return send(res, 400, 'Ongeldige URL');
-    if (urlPath === '/') urlPath = '/index.html';
+    if (urlPath.endsWith('/')) urlPath += 'index.html'; // ook in een submap, zoals GitHub Pages
 
     const filePath = path.resolve(root, '.' + urlPath);
     const relative = path.relative(root, filePath);

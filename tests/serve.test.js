@@ -63,3 +63,18 @@ test('een kapotte URL-codering geeft 400 in plaats van een crash', async () => {
   assert.equal(res.status, 400);
   await res.arrayBuffer();
 });
+
+test('een map-adres met een slash geeft de index.html van die map, zoals GitHub Pages', async (t) => {
+  const tmp = await mkdtemp(path.join(os.tmpdir(), 'schaak-serve-'));
+  t.after(() => rm(tmp, { recursive: true, force: true }));
+  await mkdir(path.join(tmp, 'schaak'));
+  await writeFile(path.join(tmp, 'schaak', 'index.html'), '<html lang="nl">submap</html>');
+
+  const fixtureServer = createDevServer(tmp);
+  await new Promise((resolve) => fixtureServer.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise((resolve) => fixtureServer.close(resolve)));
+  const res = await fetch(`http://127.0.0.1:${fixtureServer.address().port}/schaak/`);
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-type'), /text\/html/);
+  assert.match(await res.text(), /submap/);
+});

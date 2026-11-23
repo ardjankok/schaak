@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { squareOrder, isLightSquare, pieceImage, pieceName } from '../src/board-view.js';
+import { squareOrder, isLightSquare, pieceImage, pieceName, squareClasses, squareLabel } from '../src/board-view.js';
 
 test('met wit onderaan begint het bord linksboven bij a8', () => {
   const order = squareOrder('white');
@@ -47,4 +47,46 @@ test('de stukken hebben Nederlandse namen met het juiste lidwoord', () => {
   assert.equal(pieceName('b'), 'zwarte loper');
   assert.equal(pieceName('K'), 'witte koning');
   assert.equal(pieceName('N'), 'wit paard');
+});
+
+const PIECES = { e2: 'P', d7: 'p' };
+
+test('een veld zonder markering heeft alleen zijn kleur', () => {
+  assert.deepEqual(squareClasses('a1', { pieces: PIECES }), ['square', 'dark']);
+  assert.deepEqual(squareClasses('h1', { pieces: PIECES }), ['square', 'light']);
+});
+
+test('het geselecteerde veld wordt gemarkeerd', () => {
+  assert.ok(squareClasses('e2', { pieces: PIECES, selected: 'e2' }).includes('selected'));
+  assert.ok(!squareClasses('e3', { pieces: PIECES, selected: 'e2' }).includes('selected'));
+});
+
+test('een leeg doelveld krijgt een stip, geen ring', () => {
+  const classes = squareClasses('e4', { pieces: PIECES, targets: ['e3', 'e4'] });
+  assert.ok(classes.includes('target'));
+  assert.ok(!classes.includes('capture'));
+  assert.ok(!squareClasses('e5', { pieces: PIECES, targets: ['e3', 'e4'] }).includes('target'));
+});
+
+test('een doelveld met een stuk erop wordt een slagveld', () => {
+  const classes = squareClasses('d7', { pieces: PIECES, targets: ['d7'] });
+  assert.ok(classes.includes('target'));
+  assert.ok(classes.includes('capture'));
+});
+
+test('van- en naar-veld van de laatste zet worden gemarkeerd', () => {
+  const lastMove = { from: 'e2', to: 'e4' };
+  assert.ok(squareClasses('e2', { pieces: PIECES, lastMove }).includes('last-move'));
+  assert.ok(squareClasses('e4', { pieces: PIECES, lastMove }).includes('last-move'));
+  assert.ok(!squareClasses('e3', { pieces: PIECES, lastMove }).includes('last-move'));
+});
+
+test('de koning die schaak staat wordt gemarkeerd', () => {
+  assert.ok(squareClasses('e1', { pieces: PIECES, check: 'e1' }).includes('check'));
+  assert.ok(!squareClasses('e1', { pieces: PIECES, check: null }).includes('check'));
+});
+
+test('elk veld heeft een voorleestekst met veldnaam en stuk', () => {
+  assert.equal(squareLabel('e2', PIECES), 'e2, witte pion');
+  assert.equal(squareLabel('e4', PIECES), 'e4');
 });

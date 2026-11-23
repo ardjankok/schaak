@@ -42,23 +42,51 @@ export function pieceName(piece) {
 }
 
 /**
+ * De CSS-klassen van een veld: kleur, en de markeringen die erop vallen.
+ * @param {string} square
+ * @param {{ pieces: Record<string, string>, selected?: string | null, targets?: string[],
+ *   lastMove?: { from: string, to: string } | null, check?: string | null }} view
+ */
+export function squareClasses(square, { pieces, selected = null, targets = [], lastMove = null, check = null }) {
+  const classes = ['square', isLightSquare(square) ? 'light' : 'dark'];
+  if (square === selected) classes.push('selected');
+  if (targets.includes(square)) {
+    classes.push('target');
+    if (pieces[square]) classes.push('capture');
+  }
+  if (lastMove && (square === lastMove.from || square === lastMove.to)) classes.push('last-move');
+  if (square === check) classes.push('check');
+  return classes;
+}
+
+/** Voorleestekst van een veld, bijvoorbeeld 'e2, witte pion' of 'e4'. */
+export function squareLabel(square, pieces) {
+  const piece = pieces[square];
+  return piece ? `${square}, ${pieceName(piece)}` : square;
+}
+
+/**
  * Vervangt de inhoud van `container` door 64 velden met de stukken erop.
  * @param {HTMLElement} container
  * @param {Record<string, string>} pieces veldnaam -> FEN-letter
- * @param {{ orientation?: 'white' | 'black' }} [options]
+ * @param {{ orientation?: 'white' | 'black', selected?: string | null, targets?: string[],
+ *   lastMove?: { from: string, to: string } | null, check?: string | null }} [options]
  */
-export function renderBoard(container, pieces, { orientation = 'white' } = {}) {
+export function renderBoard(container, pieces, { orientation = 'white', ...marks } = {}) {
+  container.setAttribute('role', 'group');
   const squares = squareOrder(orientation).map((square, index) => {
     const el = document.createElement('div');
-    el.className = `square ${isLightSquare(square) ? 'light' : 'dark'}`;
+    el.className = squareClasses(square, { pieces, ...marks }).join(' ');
     el.dataset.square = square;
+    el.setAttribute('role', 'button');
+    el.setAttribute('aria-label', squareLabel(square, pieces));
 
     const piece = pieces[square];
     if (piece) {
       const img = document.createElement('img');
       img.className = 'piece';
       img.src = pieceImage(piece);
-      img.alt = pieceName(piece);
+      img.alt = ''; // de naam staat al in de voorleestekst van het veld
       img.draggable = false;
       el.append(img);
     }

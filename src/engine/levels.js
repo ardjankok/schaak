@@ -39,8 +39,13 @@ export function chooseMove(pos, level, { random = Math.random, timeScale = 1 } =
     return { move, score };
   }
 
+  // Zetten meer dan 5 × de ruis onder de beste worden niet exact uitgerekend (zie scoreMoves).
+  // Zo'n zet krijgt de ondergrens als score; bij 5 × de ruis wint hij vrijwel nooit (~0,3%).
+  const margin = 5 * settings.noise;
   const careless = random() < (settings.careless ?? 0);
-  const scored = careless ? scoreMoves(pos, 1, { quiescence: false }) : scoreMoves(pos, settings.depth);
+  const scored = careless
+    ? scoreMoves(pos, 1, { quiescence: false, margin })
+    : scoreMoves(pos, settings.depth, { margin });
   let best = null;
   let bestValue = -Infinity;
   for (const entry of scored) {

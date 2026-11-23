@@ -4,8 +4,8 @@ import { START_FEN } from './fen.js';
 import { Game } from './game.js';
 import { renderBoard, pieceImage } from './board-view.js';
 
-/** Hoeveel halve zetten de computer vooruit rekent. */
-const ENGINE_DEPTH = 3;
+/** Het niveau van de computer (1-5, zie src/engine/levels.js). Kiezen komt in stap 6. */
+const ENGINE_LEVEL = 1;
 /** Minimale denktijd, zodat je eerst je eigen zet ziet staan. */
 const MIN_THINK_MS = 400;
 /** Komt er zo lang geen antwoord, dan stopt het wachten met een melding. */
@@ -60,7 +60,7 @@ function cancelRequest() {
 function askComputer() {
   if (!game.isComputerTurn) return;
   cancelRequest();
-  const message = { id: requestId, startFen: game.startFen, moves: game.moves(), depth: ENGINE_DEPTH };
+  const message = { id: requestId, startFen: game.startFen, moves: game.moves(), level: ENGINE_LEVEL };
   pending = {
     id: requestId,
     message,

@@ -171,3 +171,19 @@ test('zonder legale zetten is er geen zet', () => {
   assert.equal(result.move, null);
   assert.equal(result.score, 0);
 });
+
+test('scoreMoves met een marge: dichtbij exact, ver eronder alleen een ondergrens', () => {
+  const pos = fromFen(PERFT_FENS.kiwipete);
+  const exact = new Map(scoreMoves(pos, 2).map((s) => [s.move, s.score]));
+  const bestExact = Math.max(...exact.values());
+  const withMargin = scoreMoves(pos, 2, { margin: 100 });
+  assert.equal(withMargin.length, exact.size);
+  assert.equal(Math.max(...withMargin.map((s) => s.score)), bestExact);
+  let bounded = 0;
+  for (const { move, score } of withMargin) {
+    if (exact.get(move) >= bestExact - 100) assert.equal(score, exact.get(move), moveToUci(move));
+    else assert.ok(score >= exact.get(move), moveToUci(move));
+    if (score > exact.get(move)) bounded += 1;
+  }
+  assert.ok(bounded > 0, 'met een marge worden slechte zetten niet exact uitgerekend');
+});

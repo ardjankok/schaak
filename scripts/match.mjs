@@ -1,64 +1,106 @@
-// Wedstrijd: de engine tegen een speler die willekeurige legale zetten doet.
-// Start met: npm run match
+// Wedstrijd tussen twee spelers. Start met:
+//   npm run match -- <speler A> <speler B> [partijen = 20] [tijdschaal = 1] [--min <score>]
+// Spelers: random, v1 (engine van stap 4, diepte 3), v2:<ms> (engine v2 met die denktijd), level:<n>.
 import { START_FEN } from '../src/fen.js';
+import { WHITE } from '../src/chess/constants.js';
 import { fromFen, makeMove } from '../src/chess/position.js';
 import { generateLegalMoves } from '../src/chess/movegen.js';
 import { gameStatus } from '../src/chess/status.js';
-import { search } from '../src/engine/search-v1.js';
+import { search as searchV1 } from '../src/engine/search-v1.js';
+import { search } from '../src/engine/search.js';
+import { chooseMove } from '../src/engine/levels.js';
 import { createRandom } from '../src/engine/random.js';
 
-const GAMES = 20;
-const DEPTH = 3;
-const MAX_PLIES = 400;
-const MIN_SCORE = 18;
-const MAX_MOVE_MS = 2000;
+const MAX_PLIES = 300;
+const OPENING_PLIES = 4;
 
-const engineTimes = [];
+const args = process.argv.slice(2);
+const minIndex = args.indexOf('--min');
+const minScore = minIndex >= 0 ? Number(args.splice(minIndex, 2)[1]) : null;
+const [nameA, nameB, gamesArg = '20', scaleArg = '1'] = args;
+const games = Number(gamesArg);
+const timeScale = Number(scaleArg);
+if (!nameA || !nameB) {
+  console.error('Gebruik: npm run match -- <speler A> <speler B> [partijen] [tijdschaal] [--min <score>]');
+  process.exit(2);
+}
 
-const enginePlayer = (pos, random) => {
-  const start = performance.now();
-  const { move } = search(pos, { depth: DEPTH, random });
-  engineTimes.push(performance.now() - start);
-  return move;
-};
-
-const randomPlayer = (pos, random) => {
+const randomMove = (pos, random) => {
   const moves = generateLegalMoves(pos);
   return moves[Math.floor(random() * moves.length)];
 };
 
-/** Speelt één partij. Geeft 1 (engine wint), 0.5 of 0 terug, plus de reden. */
-function playGame(engineIsWhite, random) {
+/** Maakt een speler: (pos, random) => zet, met tijden (en diepten voor v2). */
+function makePlayer(name) {
+  const stats = { name, times: [], depths: [] };
+  let think;
+  if (name === 'random') think = randomMove;
+  else if (name === 'v1') think = (pos, random) => searchV1(pos, { depth: 3, random }).move;
+  else if (name.startsWith('v2:')) {
+    const timeMs = Number(name.slice(3)) * timeScale;
+    think = (pos, random) => {
+      const result = search(pos, { timeMs, random });
+      stats.depths.push(result.depth);
+      return result.move;
+    };
+  } else if (name.startsWith('level:')) {
+    const level = Number(name.slice(6));
+    think = (pos, random) => chooseMove(pos, level, { random, timeScale }).move;
+  } else throw new Error(`Onbekende speler: ${name}`);
+
+  stats.move = (pos, random) => {
+    const start = performance.now();
+    const move = think(pos, random);
+    stats.times.push(performance.now() - start);
+    return move;
+  };
+  return stats;
+}
+
+const playerA = makePlayer(nameA);
+const playerB = makePlayer(nameB);
+
+/** Eén partij; geeft de punten voor A (1, ½ of 0) en de reden. */
+function playGame(index) {
   const pos = fromFen(START_FEN);
-  for (let ply = 0; ply < MAX_PLIES; ply++) {
+  const opening = createRandom(500 + Math.floor(index / 2)); // partij 2k en 2k+1: zelfde opening
+  for (let i = 0; i < OPENING_PLIES && gameStatus(pos).result === 'ongoing'; i++) makeMove(pos, randomMove(pos, opening));
+
+  const aIsWhite = index % 2 === 0;
+  const randomA = createRandom(1000 + index);
+  const randomB = createRandom(2000 + index);
+  for (let ply = OPENING_PLIES; ; ply++) {
     const status = gameStatus(pos);
     if (status.result !== 'ongoing') {
       if (status.result !== 'checkmate') return { points: 0.5, reason: status.result, ply };
-      const engineWon = (status.winner === 'white') === engineIsWhite;
-      return { points: engineWon ? 1 : 0, reason: 'mat', ply };
+      return { points: (status.winner === 'white') === aIsWhite ? 1 : 0, reason: 'mat', ply };
     }
-    const engineToMove = (pos.turn === 0) === engineIsWhite;
-    makeMove(pos, (engineToMove ? enginePlayer : randomPlayer)(pos, random));
+    if (ply >= MAX_PLIES) return { points: 0.5, reason: `${MAX_PLIES} halve zetten`, ply };
+    const aToMove = (pos.turn === WHITE) === aIsWhite;
+    makeMove(pos, aToMove ? playerA.move(pos, randomA) : playerB.move(pos, randomB));
   }
-  return { points: 0.5, reason: `${MAX_PLIES} halve zetten`, ply: MAX_PLIES };
 }
 
 let score = 0;
 const tally = { win: 0, draw: 0, loss: 0 };
-for (let i = 0; i < GAMES; i++) {
-  const engineIsWhite = i % 2 === 0;
-  const { points, reason, ply } = playGame(engineIsWhite, createRandom(1000 + i));
+for (let i = 0; i < games; i++) {
+  const { points, reason, ply } = playGame(i);
   score += points;
   tally[points === 1 ? 'win' : points === 0 ? 'loss' : 'draw'] += 1;
   const label = points === 1 ? 'winst  ' : points === 0 ? 'verlies' : 'remise ';
-  console.log(`partij ${String(i + 1).padStart(2)} (engine ${engineIsWhite ? 'wit  ' : 'zwart'}): ${label} ${reason}, ${ply} halve zetten`);
+  console.log(`partij ${String(i + 1).padStart(2)} (${nameA} ${i % 2 === 0 ? 'wit  ' : 'zwart'}): ${label} ${reason}, ${ply} halve zetten`);
 }
 
-const average = engineTimes.reduce((a, b) => a + b, 0) / engineTimes.length;
-const longest = Math.max(...engineTimes);
-console.log(`\nwinst ${tally.win}, remise ${tally.draw}, verlies ${tally.loss}: score ${score}/${GAMES}`);
-console.log(`denktijd engine (diepte ${DEPTH}): gemiddeld ${average.toFixed(1)} ms, langste ${longest.toFixed(0)} ms, ${engineTimes.length} zetten`);
-
-const ok = score >= MIN_SCORE && tally.loss === 0 && longest < MAX_MOVE_MS;
-console.log(ok ? 'OK' : `FOUT: nodig is score >= ${MIN_SCORE}, 0 verloren en langste zet < ${MAX_MOVE_MS} ms`);
-process.exitCode = ok ? 0 : 1;
+const summary = (p) => {
+  const avg = p.times.reduce((a, b) => a + b, 0) / Math.max(1, p.times.length);
+  const depth = p.depths.length ? `, gemiddelde diepte ${(p.depths.reduce((a, b) => a + b, 0) / p.depths.length).toFixed(1)}` : '';
+  return `${p.name}: gemiddeld ${avg.toFixed(1)} ms, langste ${Math.max(0, ...p.times).toFixed(0)} ms per zet${depth}`;
+};
+console.log(`\n${nameA} tegen ${nameB}: winst ${tally.win}, remise ${tally.draw}, verlies ${tally.loss}; score ${nameA} ${score}/${games}`);
+console.log(summary(playerA));
+console.log(summary(playerB));
+if (minScore !== null) {
+  const ok = score >= minScore;
+  console.log(ok ? `OK (minimaal ${minScore})` : `FOUT: score ${score} is lager dan ${minScore}`);
+  process.exitCode = ok ? 0 : 1;
+}

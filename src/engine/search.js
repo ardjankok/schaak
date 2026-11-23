@@ -246,17 +246,24 @@ export function search(pos, { maxDepth = 64, timeMs = Infinity, random = Math.ra
 }
 
 /**
- * Een exacte score voor elke legale zet: zoeken op depth - 1 met een vol venster.
+ * Een score voor elke legale zet: zoeken op depth - 1 met een vol venster.
  * Zonder quiescence is diepte 0 gewoon de evaluatie: dan wordt terugslaan na de
  * horizon niet gezien (de "slordige" blik van de lage niveaus).
+ * Met een marge zijn alleen zetten tot `margin` onder de beste exact; een zet
+ * die verder onder de beste blijft, krijgt die ondergrens als score. Dat
+ * scheelt veel rekenwerk, en met ruis van een vijfde van de marge kiest een
+ * niveau zo'n zet toch vrijwel nooit.
  * @returns {Array<{ move: number, score: number }>}
  */
-export function scoreMoves(pos, depth, { quiescence = true } = {}) {
+export function scoreMoves(pos, depth, { quiescence = true, margin = Infinity } = {}) {
   const searcher = new Searcher({ quiescence });
-  return legalMoves(pos).map((move) => {
+  let best = -INFINITY;
+  return searcher.ordered(pos, legalMoves(pos), 0, 0).map((move) => {
+    const floor = Math.max(-INFINITY, best - margin);
     makeMove(pos, move);
-    const score = -searcher.negamax(pos, depth - 1, -INFINITY, INFINITY, 1);
+    const score = -searcher.negamax(pos, depth - 1, -INFINITY, -floor, 1);
     unmakeMove(pos);
+    if (score > best) best = score;
     return { move, score };
   });
 }

@@ -29,7 +29,7 @@
 
 ---
 
-### Taak 1: Projectopzet en lokale dev-server
+### Task 1: Projectopzet en lokale dev-server
 
 **Files:**
 - Create: `package.json`
@@ -77,7 +77,7 @@ git commit -m "Projectopzet en lokale dev-server"
 
 ---
 
-### Taak 2: FEN lezen
+### Task 2: FEN lezen
 
 **Files:**
 - Create: `src/fen.js`
@@ -119,7 +119,7 @@ git commit -m "FEN lezen"
 
 ---
 
-### Taak 3: Het bord tekenen
+### Task 3: Het bord tekenen
 
 **Files:**
 - Create: `src/board-view.js`

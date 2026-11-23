@@ -47,19 +47,22 @@ export function isInsufficientMaterial(pos) {
 }
 
 /**
- * Komt de huidige stelling voor de 3e keer voor? Alleen stellingen sinds de
- * laatste slag of pionzet tellen, en alleen met dezelfde speler aan zet.
+ * Hoe vaak de huidige stelling is voorgekomen, deze keer meegeteld. Alleen
+ * stellingen sinds de laatste slag of pionzet tellen, en alleen met dezelfde
+ * speler aan zet.
  */
-export function isThreefoldRepetition(pos) {
+export function countRepetitions(pos) {
   const history = pos.history;
   const reach = Math.min(pos.halfmoveClock, history.length);
   let count = 1;
   for (let back = 2; back <= reach; back += 2) {
     const earlier = history[history.length - back];
-    if (earlier.hashLo === pos.hashLo && earlier.hashHi === pos.hashHi) {
-      count += 1;
-      if (count >= 3) return true;
-    }
+    if (earlier.hashLo === pos.hashLo && earlier.hashHi === pos.hashHi) count += 1;
   }
-  return false;
+  return count;
+}
+
+/** Komt de huidige stelling voor de 3e keer voor? */
+export function isThreefoldRepetition(pos) {
+  return countRepetitions(pos) >= 3;
 }

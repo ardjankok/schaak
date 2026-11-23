@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { START_FEN } from '../../src/fen.js';
 import { fromFen, makeMove } from '../../src/chess/position.js';
-import { gameStatus } from '../../src/chess/status.js';
+import { gameStatus, countRepetitions } from '../../src/chess/status.js';
 import { moveFromUci } from '../../src/chess/notation.js';
 
 const statusOf = (fen) => gameStatus(fromFen(fen));
@@ -76,4 +76,11 @@ test('stellingen met andere rokaderechten tellen niet als herhaling', () => {
   assert.equal(gameStatus(pos).result, 'ongoing', 'na ronde 2');
   play(pos, 'e1e2 e8e7 e2e1 e7e8');
   assert.equal(gameStatus(pos).result, 'draw-repetition', 'na ronde 3');
+});
+
+test('countRepetitions telt hoe vaak de huidige stelling is voorgekomen', () => {
+  const pos = fromFen(START_FEN);
+  assert.equal(countRepetitions(pos), 1);
+  play(pos, 'g1f3 g8f6 f3g1 f6g8');
+  assert.equal(countRepetitions(pos), 2);
 });

@@ -8,6 +8,7 @@
     "perft": "node scripts/perft.mjs",
     "match": "node scripts/match.mjs",
     "bench": "node scripts/bench-levels.mjs",
-    "icons": "node scripts/make-icons.mjs"
+    "icons": "node scripts/make-icons.mjs",
+    "build-sw": "node scripts/build-sw.mjs"
   }
 }

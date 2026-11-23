@@ -167,3 +167,8 @@ newGameButton.addEventListener('click', () => {
 
 render();
 askComputer();
+
+// Zet de app in de cache, zodat hij ook zonder internet werkt (zie sw.js).
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch((error) => console.error('Service worker niet geregistreerd:', error));
+}

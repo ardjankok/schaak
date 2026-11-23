@@ -11,6 +11,11 @@ test('een zet heen en terug als tekst', () => {
   assert.equal(moveToUci(moveFromUci(fromFen(START_FEN), 'e2e4')), 'e2e4');
 });
 
+test('moveToUci zonder zet geeft null', () => {
+  assert.equal(moveToUci(null), null);
+  assert.equal(moveToUci(undefined), null);
+});
+
 test('rokade wordt herkend', () => {
   const move = moveFromUci(fromFen('r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1'), 'e1g1');
   assert.notEqual(move, null);

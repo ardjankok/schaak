@@ -5,7 +5,9 @@ import { generateLegalMoves } from './movegen.js';
 const PROMOTION_LETTERS = { [KNIGHT]: 'n', [BISHOP]: 'b', [ROOK]: 'r', [QUEEN]: 'q' };
 const UCI_PATTERN = /^[a-h][1-8][a-h][1-8][nbrq]?$/;
 
+/** De zet als tekst, of null als er geen zet is. */
 export function moveToUci(move) {
+  if (typeof move !== 'number') return null;
   const promotion = movePromotion(move);
   return squareName(moveFrom(move)) + squareName(moveTo(move)) + (promotion ? PROMOTION_LETTERS[promotion] : '');
 }

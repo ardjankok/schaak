@@ -1,11 +1,15 @@
 // De schaakstelling: bord, wie aan zet is, rokaderechten, en passant en klokken.
 import { boardFromFen } from '../fen.js';
 import {
-  WHITE, BLACK, KING, ROOK, pieceColor, pieceType,
+  WHITE, BLACK, PAWN, KING, ROOK, pieceColor, pieceType,
   CASTLE_WK, CASTLE_WQ, CASTLE_BK, CASTLE_BQ,
+  FLAG_DOUBLE_PUSH, FLAG_EN_PASSANT, FLAG_CASTLE,
   squareFromName, squareName, pieceFromLetter, letterFromPiece,
+  moveFrom, moveTo, moveFlags, movePromotion,
 } from './constants.js';
-import { computeHash } from './zobrist.js';
+import {
+  computeHash, isEpRelevant, PIECE_KEYS, CASTLING_KEYS, EP_KEYS, SIDE_KEY,
+} from './zobrist.js';
 
 export class Position {
   constructor() {
@@ -128,4 +132,140 @@ export function boardFromPosition(pos) {
     if (!(sq & 0x88) && pos.board[sq]) pieces[squareName(sq)] = letterFromPiece(pos.board[sq]);
   }
   return pieces;
+}
+
+// Per veld: welke rokaderechten blijven over als er een zet van of naar dit veld gaat.
+const CASTLING_MASK = new Int8Array(128).fill(15);
+CASTLING_MASK[squareFromName('e1')] = 15 & ~(CASTLE_WK | CASTLE_WQ);
+CASTLING_MASK[squareFromName('h1')] = 15 & ~CASTLE_WK;
+CASTLING_MASK[squareFromName('a1')] = 15 & ~CASTLE_WQ;
+CASTLING_MASK[squareFromName('e8')] = 15 & ~(CASTLE_BK | CASTLE_BQ);
+CASTLING_MASK[squareFromName('h8')] = 15 & ~CASTLE_BK;
+CASTLING_MASK[squareFromName('a8')] = 15 & ~CASTLE_BQ;
+
+/** Bij een rokade: [torenVan, torenNaar], afgeleid van koningVan en koningNaar. */
+function castlingRookSquares(from, to) {
+  return to > from ? [from + 3, from + 1] : [from - 4, from - 1];
+}
+
+/**
+ * Voert een zet uit, zonder te controleren of hij legaal is.
+ * De hash wordt stapsgewijs bijgewerkt.
+ */
+export function makeMove(pos, move) {
+  const board = pos.board;
+  const from = moveFrom(move);
+  const to = moveTo(move);
+  const flags = moveFlags(move);
+  const promotion = movePromotion(move);
+  const us = pos.turn;
+  const piece = board[from];
+
+  let capturedSquare = to;
+  if (flags & FLAG_EN_PASSANT) capturedSquare = to + (us === WHITE ? -16 : 16);
+  const captured = board[capturedSquare];
+
+  pos.history.push({
+    move,
+    captured,
+    castling: pos.castling,
+    epSquare: pos.epSquare,
+    halfmoveClock: pos.halfmoveClock,
+    hashLo: pos.hashLo,
+    hashHi: pos.hashHi,
+  });
+
+  let lo = pos.hashLo;
+  let hi = pos.hashHi;
+
+  // Oud en-passantveld en oude rokaderechten uit de hash halen.
+  if (isEpRelevant(board, pos.epSquare, us)) {
+    lo ^= EP_KEYS.lo[pos.epSquare & 7];
+    hi ^= EP_KEYS.hi[pos.epSquare & 7];
+  }
+  lo ^= CASTLING_KEYS.lo[pos.castling];
+  hi ^= CASTLING_KEYS.hi[pos.castling];
+
+  // Geslagen stuk weghalen.
+  if (captured) {
+    lo ^= PIECE_KEYS.lo[captured * 128 + capturedSquare];
+    hi ^= PIECE_KEYS.hi[captured * 128 + capturedSquare];
+    board[capturedSquare] = 0;
+  }
+
+  // Stuk verplaatsen (bij promotie wordt het een ander stuk).
+  const placed = promotion ? us | promotion : piece;
+  lo ^= PIECE_KEYS.lo[piece * 128 + from] ^ PIECE_KEYS.lo[placed * 128 + to];
+  hi ^= PIECE_KEYS.hi[piece * 128 + from] ^ PIECE_KEYS.hi[placed * 128 + to];
+  board[from] = 0;
+  board[to] = placed;
+
+  if (flags & FLAG_CASTLE) {
+    const [rookFrom, rookTo] = castlingRookSquares(from, to);
+    const rook = board[rookFrom];
+    lo ^= PIECE_KEYS.lo[rook * 128 + rookFrom] ^ PIECE_KEYS.lo[rook * 128 + rookTo];
+    hi ^= PIECE_KEYS.hi[rook * 128 + rookFrom] ^ PIECE_KEYS.hi[rook * 128 + rookTo];
+    board[rookFrom] = 0;
+    board[rookTo] = rook;
+  }
+
+  if (pieceType(piece) === KING) pos.kings[us >> 3] = to;
+
+  pos.castling &= CASTLING_MASK[from] & CASTLING_MASK[to];
+  lo ^= CASTLING_KEYS.lo[pos.castling];
+  hi ^= CASTLING_KEYS.hi[pos.castling];
+
+  pos.epSquare = flags & FLAG_DOUBLE_PUSH ? (from + to) >> 1 : -1;
+  pos.halfmoveClock = pieceType(piece) === PAWN || captured ? 0 : pos.halfmoveClock + 1;
+  if (us === BLACK) pos.fullmoveNumber += 1;
+
+  pos.turn = us ^ 8;
+  lo ^= SIDE_KEY.lo[0];
+  hi ^= SIDE_KEY.hi[0];
+
+  // Nieuw en-passantveld (alleen als de tegenstander echt kan slaan).
+  if (isEpRelevant(board, pos.epSquare, pos.turn)) {
+    lo ^= EP_KEYS.lo[pos.epSquare & 7];
+    hi ^= EP_KEYS.hi[pos.epSquare & 7];
+  }
+
+  pos.hashLo = lo;
+  pos.hashHi = hi;
+}
+
+/** Draait de laatste makeMove exact terug. */
+export function unmakeMove(pos) {
+  const record = pos.history.pop();
+  const { move, captured } = record;
+  const board = pos.board;
+  const from = moveFrom(move);
+  const to = moveTo(move);
+  const flags = moveFlags(move);
+  const us = pos.turn ^ 8;
+
+  const moved = movePromotion(move) ? us | PAWN : board[to];
+  board[from] = moved;
+  board[to] = 0;
+
+  if (flags & FLAG_EN_PASSANT) {
+    board[to + (us === WHITE ? -16 : 16)] = captured;
+  } else if (captured) {
+    board[to] = captured;
+  }
+
+  if (flags & FLAG_CASTLE) {
+    const [rookFrom, rookTo] = castlingRookSquares(from, to);
+    board[rookFrom] = board[rookTo];
+    board[rookTo] = 0;
+  }
+
+  if (pieceType(moved) === KING) pos.kings[us >> 3] = from;
+
+  pos.turn = us;
+  if (us === BLACK) pos.fullmoveNumber -= 1;
+  pos.castling = record.castling;
+  pos.epSquare = record.epSquare;
+  pos.halfmoveClock = record.halfmoveClock;
+  pos.hashLo = record.hashLo;
+  pos.hashHi = record.hashHi;
 }

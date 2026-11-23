@@ -5,6 +5,7 @@
   "scripts": {
     "start": "node scripts/serve.mjs",
     "test": "node --test \"tests/**/*.test.js\"",
-    "perft": "node scripts/perft.mjs"
+    "perft": "node scripts/perft.mjs",
+    "match": "node scripts/match.mjs"
   }
 }

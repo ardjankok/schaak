@@ -4,7 +4,7 @@ import { START_FEN } from '../src/fen.js';
 import { fromFen, makeMove } from '../src/chess/position.js';
 import { generateLegalMoves } from '../src/chess/movegen.js';
 import { gameStatus } from '../src/chess/status.js';
-import { search } from '../src/engine/search.js';
+import { search } from '../src/engine/search-v1.js';
 import { createRandom } from '../src/engine/random.js';
 
 const GAMES = 20;

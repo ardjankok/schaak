@@ -1,20 +1,9 @@
-// Zoekt de beste zet met negamax en alfa-bètasnoeiing, op een vaste diepte.
+// Engine versie 1 (stap 4): negamax met alfa-bèta op een vaste diepte, alleen
+// materiaal. Blijft bewaard om nieuwe versies tegen te laten spelen.
 import { makeMove, unmakeMove } from '../chess/position.js';
 import { generateLegalMoves, isInCheck } from '../chess/movegen.js';
-import { countRepetitions, isInsufficientMaterial } from '../chess/status.js';
-import { evaluate } from './evaluate.js';
-
-/** Score voor mat. Een mat na n halve zetten scoort MATE - n, zodat sneller mat beter is. */
-export const MATE = 100000;
-
-/**
- * Remise volgens de zoekboom: 50 zetten, te weinig materiaal, of een
- * stelling die al eerder voorkwam. Eén herhaling telt al, anders loopt een
- * engine die voor staat zo een herhaling in.
- */
-export function isDraw(pos) {
-  return pos.halfmoveClock >= 100 || isInsufficientMaterial(pos) || countRepetitions(pos) >= 2;
-}
+import { evaluateMaterial as evaluate } from './evaluate.js';
+import { MATE, isDraw, shuffle } from './common.js';
 
 /**
  * @param {import('../chess/position.js').Position} pos wordt tijdelijk gewijzigd, en daarna teruggezet
@@ -58,13 +47,4 @@ function negamax(pos, depth, alpha, beta, ply, counter) {
     if (score > alpha) alpha = score;
   }
   return alpha;
-}
-
-/** Fisher-Yates: schudt de lijst op zijn plaats en geeft hem terug. */
-function shuffle(list, random) {
-  for (let i = list.length - 1; i > 0; i--) {
-    const j = Math.floor(random() * (i + 1));
-    [list[i], list[j]] = [list[j], list[i]];
-  }
-  return list;
 }

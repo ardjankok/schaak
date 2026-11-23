@@ -2,7 +2,7 @@
 // Puur en zonder DOM: de worker en het wedstrijdscript gebruiken dit allebei.
 import { fromFen, makeMove } from '../chess/position.js';
 import { moveFromUci, moveToUci } from '../chess/notation.js';
-import { search } from './search.js';
+import { search } from './search-v1.js';
 import { createRandom } from './random.js';
 
 /** De stelling na de gespeelde zetten, met geschiedenis (voor herhaling). */

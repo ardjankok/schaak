@@ -6,7 +6,8 @@ import { generateLegalMoves } from '../../src/chess/movegen.js';
 import { gameStatus } from '../../src/chess/status.js';
 import { moveToUci, moveFromUci } from '../../src/chess/notation.js';
 import { createRandom } from '../../src/engine/random.js';
-import { search, isDraw, MATE } from '../../src/engine/search.js';
+import { search } from '../../src/engine/search-v1.js';
+import { isDraw, MATE } from '../../src/engine/common.js';
 import { PERFT_FENS } from '../chess/fixtures.js';
 
 const best = (fen, depth, seed = 1) => {
@@ -107,4 +108,10 @@ test('de engine speelt alleen legale zetten', () => {
     assert.ok(legal.includes(move), `zet ${i + 1}: ${moveToUci(move)}`);
     makeMove(pos, move);
   }
+});
+
+test('mat op de 100e halve zet telt als mat, niet als remise', () => {
+  const result = best('6k1/5ppp/8/8/8/8/8/R5K1 w - - 99 80', 3);
+  assert.equal(result.uci, 'a1a8');
+  assert.equal(result.score, MATE - 1);
 });

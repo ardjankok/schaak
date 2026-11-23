@@ -1,5 +1,6 @@
-// Een partij voor twee spelers op één scherm. Vertaalt tikken op velden naar
-// zetten en houdt bij wat geselecteerd is. Zonder DOM, zodat alles te testen is.
+// Een partij op één scherm: met z'n tweeën, of tegen de computer. Vertaalt
+// tikken op velden naar zetten en houdt bij wat geselecteerd is. Zonder DOM,
+// zodat alles te testen is.
 import { START_FEN } from './fen.js';
 import { WHITE, squareName, moveFrom, moveTo, movePromotion } from './chess/constants.js';
 import { fromFen, makeMove, boardFromPosition } from './chess/position.js';
@@ -17,25 +18,48 @@ const DRAW_TEXTS = {
   'draw-material': 'Remise: te weinig materiaal om mat te zetten',
 };
 
-/** De statusregel onder het bord. */
-export function describeStatus(status, turn, inCheck) {
-  if (status.result === 'checkmate') return `Schaakmat! ${COLOR_NAMES[status.winner]} wint`;
+/**
+ * De statusregel onder het bord.
+ * @param {'white' | 'black' | null} computerColor null bij twee spelers
+ */
+export function describeStatus(status, turn, inCheck, computerColor = null) {
+  if (status.result === 'checkmate') {
+    if (!computerColor) return `Schaakmat! ${COLOR_NAMES[status.winner]} wint`;
+    return status.winner === computerColor ? 'Schaakmat! De computer wint' : 'Schaakmat! Jij wint';
+  }
   if (DRAW_TEXTS[status.result]) return DRAW_TEXTS[status.result];
-  const toMove = `${COLOR_NAMES[turn]} is aan zet`;
+  let toMove = `${COLOR_NAMES[turn]} is aan zet`;
+  if (computerColor) toMove = turn === computerColor ? 'De computer denkt na…' : 'Jij bent aan zet';
   return inCheck ? `Schaak! ${toMove}` : toMove;
 }
 
 export class Game {
-  constructor(fen = START_FEN) {
+  /** @param {{ computerColor?: 'white' | 'black' | null }} [options] */
+  constructor(fen = START_FEN, { computerColor = null } = {}) {
+    this._computerColor = computerColor;
     this.reset(fen);
   }
 
   reset(fen = START_FEN) {
     this._pos = fromFen(fen);
+    this._startFen = fen;
+    this._moves = [];
     this._selected = null;
     this._lastMove = null;
     this._pendingPromotion = null;
     this._update();
+  }
+
+  get startFen() {
+    return this._startFen;
+  }
+
+  get computerColor() {
+    return this._computerColor;
+  }
+
+  get isComputerTurn() {
+    return this._computerColor !== null && !this.isOver && this.turn === this._computerColor;
   }
 
   get turn() {
@@ -66,6 +90,11 @@ export class Game {
     return this._status.result !== 'ongoing';
   }
 
+  /** De gespeelde zetten in UCI sinds `startFen` (een kopie). */
+  moves() {
+    return [...this._moves];
+  }
+
   pieces() {
     return boardFromPosition(this._pos);
   }
@@ -80,7 +109,7 @@ export class Game {
   }
 
   tap(square) {
-    if (this.isOver || this._pendingPromotion) return 'ignored';
+    if (this.isComputerTurn || this.isOver || this._pendingPromotion) return 'ignored';
 
     if (this._selected && this.targets().includes(square)) {
       const from = this._selected;
@@ -122,14 +151,30 @@ export class Game {
     this._selected = null;
   }
 
+  /** Speelt een zet in UCI, zoals die van de computer. Geeft false als hij niet legaal is. */
+  playUci(uci) {
+    if (this.isOver) return false;
+    const move = moveFromUci(this._pos, uci);
+    if (move === null) return false;
+    this._pendingPromotion = null;
+    this._apply(move, uci);
+    return true;
+  }
+
   statusText() {
-    return describeStatus(this._status, this.turn, this._checkSquare !== null);
+    return describeStatus(this._status, this.turn, this._checkSquare !== null, this._computerColor);
   }
 
   _play(from, to, promotion) {
-    makeMove(this._pos, moveFromUci(this._pos, from + to + promotion));
+    const uci = from + to + promotion;
+    this._apply(moveFromUci(this._pos, uci), uci);
+  }
+
+  _apply(move, uci) {
+    makeMove(this._pos, move);
+    this._moves.push(uci);
     this._selected = null;
-    this._lastMove = { from, to };
+    this._lastMove = Object.freeze({ from: uci.slice(0, 2), to: uci.slice(2, 4) });
     this._update();
   }
 
@@ -149,7 +194,7 @@ export class Game {
   /** Rekent na elke zet de legale zetten, de status en het schaakveld opnieuw uit. */
   _update() {
     this._legalMoves = generateLegalMoves(this._pos);
-    this._status = gameStatus(this._pos);
+    this._status = Object.freeze(gameStatus(this._pos));
     this._checkSquare = isInCheck(this._pos) ? squareName(this._pos.kings[this._pos.turn >> 3]) : null;
   }
 }

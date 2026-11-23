@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Game, describeStatus } from '../src/game.js';
+import { START_FEN } from '../src/fen.js';
 
 const PINNED_FEN = '4k3/4r3/8/8/8/8/4N3/4K3 w - - 0 1';
 const PROMOTION_FEN = 'k7/4P3/8/8/8/8/8/K7 w - - 0 1';
@@ -170,4 +171,108 @@ test('describeStatus geeft voor elke situatie de juiste tekst', () => {
   for (const [status, turn, inCheck, expected] of cases) {
     assert.equal(describeStatus(status, turn, inCheck), expected, `${status.result} ${turn} ${inCheck}`);
   }
+});
+
+// --- Tegen de computer (stap 4) ---
+
+const vsComputer = (fen = START_FEN) => new Game(fen, { computerColor: 'black' });
+
+test('tegen de computer begin jij, met wit', () => {
+  const game = vsComputer();
+  assert.equal(game.computerColor, 'black');
+  assert.equal(game.isComputerTurn, false);
+  assert.equal(game.statusText(), 'Jij bent aan zet');
+  assert.deepEqual(game.moves(), []);
+  assert.equal(game.startFen, START_FEN);
+});
+
+test('na jouw zet is de computer aan zet en doet tikken niets', () => {
+  const game = vsComputer();
+  play(game, 'e2e4');
+  assert.equal(game.isComputerTurn, true);
+  assert.equal(game.statusText(), 'De computer denkt na…');
+  assert.deepEqual(game.moves(), ['e2e4']);
+  assert.equal(game.tap('e7'), 'ignored');
+  assert.equal(game.selected, null);
+});
+
+test('playUci speelt de zet van de computer', () => {
+  const game = vsComputer();
+  play(game, 'e2e4');
+  assert.equal(game.playUci('e7e5'), true);
+  assert.equal(game.turn, 'white');
+  assert.deepEqual(game.lastMove, { from: 'e7', to: 'e5' });
+  assert.deepEqual(game.moves(), ['e2e4', 'e7e5']);
+  assert.equal(game.isComputerTurn, false);
+});
+
+test('playUci weigert een zet die niet past, en verandert dan niets', () => {
+  const game = vsComputer();
+  play(game, 'e2e4');
+  assert.equal(game.playUci('e2e5'), false);
+  assert.equal(game.playUci('zzz'), false);
+  assert.equal(game.playUci(undefined), false);
+  assert.deepEqual(game.moves(), ['e2e4']);
+  assert.equal(game.turn, 'black');
+});
+
+test('moves geeft een kopie', () => {
+  const game = vsComputer();
+  play(game, 'e2e4');
+  game.moves().push('x');
+  assert.deepEqual(game.moves(), ['e2e4']);
+});
+
+test('de computer kan promoveren', () => {
+  const game = vsComputer('4k3/8/8/8/8/8/p7/4K3 w - - 0 1');
+  play(game, 'e1d1');
+  assert.equal(game.playUci('a2a1q'), true);
+  assert.equal(game.pieces().a1, 'q');
+  assert.equal(game.pendingPromotion, null);
+});
+
+test('de computer kan mat geven, en daarna gebeurt er niets meer', () => {
+  const game = vsComputer();
+  play(game, 'f2f3');
+  game.playUci('e7e5');
+  play(game, 'g2g4');
+  game.playUci('d8h4');
+  assert.equal(game.isOver, true);
+  assert.equal(game.isComputerTurn, false);
+  assert.equal(game.statusText(), 'Schaakmat! De computer wint');
+  assert.equal(game.playUci('a7a6'), false);
+});
+
+test('reset houdt de computerkleur', () => {
+  const game = vsComputer();
+  play(game, 'e2e4');
+  game.reset();
+  assert.equal(game.computerColor, 'black');
+  assert.deepEqual(game.moves(), []);
+  assert.equal(game.statusText(), 'Jij bent aan zet');
+});
+
+test('status en lastMove kun je niet per ongeluk veranderen', () => {
+  const game = vsComputer();
+  play(game, 'e2e4');
+  assert.throws(() => { game.lastMove.from = 'a1'; }, TypeError);
+  assert.throws(() => { game.status.result = 'checkmate'; }, TypeError);
+});
+
+test('describeStatus tegen de computer', () => {
+  const ongoing = { result: 'ongoing', winner: null };
+  const cases = [
+    [ongoing, 'white', false, 'Jij bent aan zet'],
+    [ongoing, 'white', true, 'Schaak! Jij bent aan zet'],
+    [ongoing, 'black', false, 'De computer denkt na…'],
+    [ongoing, 'black', true, 'Schaak! De computer denkt na…'],
+    [{ result: 'checkmate', winner: 'white' }, 'black', true, 'Schaakmat! Jij wint'],
+    [{ result: 'checkmate', winner: 'black' }, 'white', true, 'Schaakmat! De computer wint'],
+    [{ result: 'stalemate', winner: null }, 'black', false, 'Pat: remise'],
+    [{ result: 'draw-repetition', winner: null }, 'white', false, 'Remise: drie keer dezelfde stelling'],
+  ];
+  for (const [status, turn, inCheck, expected] of cases) {
+    assert.equal(describeStatus(status, turn, inCheck, 'black'), expected, `${status.result} ${turn} ${inCheck}`);
+  }
+  assert.equal(describeStatus(ongoing, 'white', false, null), 'Wit is aan zet');
 });

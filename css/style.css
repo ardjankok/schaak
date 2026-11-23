@@ -3,15 +3,26 @@
   --square-dark: #b58863;
   --bg: #f4f1ec;
   --text: #2b2622;
+  --button-bg: #e3dcd1;
   --header-height: 56px;
+  --panel-height: 64px;
+  --side-panel-width: 180px;
   --gutter: 16px;
+  --mark-selected: rgb(20 85 30 / 0.5);
+  --mark-last-move: rgb(155 199 0 / 0.41);
+  --mark-target: rgb(20 85 30 / 0.5);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #1f1d1b;
     --text: #ece6de;
+    --button-bg: #3a3632;
   }
+}
+
+[hidden] {
+  display: none !important;
 }
 
 * {
@@ -40,13 +51,15 @@ h1 {
 }
 
 main {
+  /* Bordgrootte; ook de statusregel en de coördinaten rekenen ermee. */
+  --size: min(100vw - var(--gutter), 100dvh - var(--header-height) - var(--panel-height) - var(--gutter), 640px);
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
   padding: 0 calc(var(--gutter) / 2) calc(var(--gutter) / 2);
 }
 
 .board {
-  --size: min(100vw - var(--gutter), 100dvh - var(--header-height) - var(--gutter), 640px);
   width: var(--size);
   aspect-ratio: 1;
   display: grid;
@@ -69,6 +82,27 @@ main {
 
 .square.dark {
   background: var(--square-dark);
+}
+
+/* Markeringen: bovenop de veldkleur, onder het stuk. */
+.square.last-move {
+  box-shadow: inset 0 0 0 999px var(--mark-last-move);
+}
+
+.square.selected {
+  box-shadow: inset 0 0 0 999px var(--mark-selected);
+}
+
+.square.target {
+  background-image: radial-gradient(circle closest-side, var(--mark-target) 30%, transparent 33%);
+}
+
+.square.target.capture {
+  background-image: radial-gradient(circle closest-side, transparent 84%, var(--mark-target) 87%);
+}
+
+.square.check {
+  background-image: radial-gradient(circle closest-side, rgb(255 0 0) 0%, rgb(231 0 0) 30%, rgb(169 0 0 / 0) 100%);
 }
 
 .piece {
@@ -103,4 +137,92 @@ main {
 
 .square.dark .coord {
   color: var(--square-light);
+}
+
+.panel {
+  width: var(--size);
+  height: var(--panel-height);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+#status {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+}
+
+button {
+  min-height: 44px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 8px;
+  background: var(--button-bg);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+#new-game {
+  flex: none;
+}
+
+/* Promotiemenu. De dialog zelf heeft geen rand of opvulling, zodat een tik op
+   de dialog (en niet op een knop) altijd een tik naast het menu is. */
+#promotion {
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+#promotion::backdrop {
+  background: rgb(0 0 0 / 0.55);
+}
+
+.promotion-choices {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+}
+
+.promotion-choices button {
+  width: 64px;
+  height: 64px;
+  padding: 4px;
+  background: var(--square-light);
+}
+
+.promotion-choices img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Liggend op een telefoon: geen titel, bord links en de status ernaast. */
+@media (orientation: landscape) and (max-height: 500px) {
+  header {
+    display: none;
+  }
+
+  main {
+    --size: min(100dvh - var(--gutter), 100vw - var(--side-panel-width) - var(--gutter) * 1.5, 640px);
+    flex-direction: row;
+    justify-content: center;
+    gap: calc(var(--gutter) / 2);
+    padding: calc(var(--gutter) / 2);
+  }
+
+  .panel {
+    width: var(--side-panel-width);
+    height: auto;
+    flex-direction: column;
+  }
 }

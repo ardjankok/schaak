@@ -13,7 +13,19 @@
   </header>
   <main>
     <div id="board" class="board" aria-label="Schaakbord"></div>
+    <section class="panel">
+      <p id="status" role="status" aria-live="polite"></p>
+      <button id="new-game" type="button" hidden>Nieuwe partij</button>
+    </section>
   </main>
+  <dialog id="promotion" aria-label="Kies een stuk voor de promotie">
+    <div class="promotion-choices">
+      <button type="button" data-piece="q" aria-label="Promoveer tot dame"><img alt=""></button>
+      <button type="button" data-piece="r" aria-label="Promoveer tot toren"><img alt=""></button>
+      <button type="button" data-piece="b" aria-label="Promoveer tot loper"><img alt=""></button>
+      <button type="button" data-piece="n" aria-label="Promoveer tot paard"><img alt=""></button>
+    </div>
+  </dialog>
   <script type="module" src="src/main.js"></script>
 </body>
 </html>

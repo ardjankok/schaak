@@ -4,12 +4,15 @@
 import { WHITE, BLACK, PAWN } from './constants.js';
 
 // Vaste seed, zodat de sleutels bij elke start hetzelfde zijn.
+// mulberry32 is niet-lineair. Een lineaire generator (zoals xorshift) maakt van
+// twee opeenvolgende getallen geen onafhankelijke helften: dan is hi een vaste
+// functie van lo en heeft de sleutel feitelijk maar 32 bits.
 let state = 0x9e3779b9;
 function nextRandom() {
-  state ^= state << 13;
-  state ^= state >>> 17;
-  state ^= state << 5;
-  return state | 0;
+  state = (state + 0x6d2b79f5) | 0;
+  let t = Math.imul(state ^ (state >>> 15), 1 | state);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return (t ^ (t >>> 14)) | 0;
 }
 
 function keyTable(size) {

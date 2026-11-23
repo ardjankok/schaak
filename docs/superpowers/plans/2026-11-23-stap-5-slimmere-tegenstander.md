@@ -39,7 +39,7 @@
 
 **Interfaces:**
 - Produces:
-  - `src/engine/common.js`: `MATE = 100000`, `isDraw(pos)` en `shuffle(list, random)`, verhuisd uit de search van stap 4 en ongewijzigd.
+  - `src/engine/common.js`: `MATE = 100000`, `isDraw(pos)` en `shuffle(list, random)`, verhuisd uit de search van stap 4. Eén reparatie uit de review van stap 4: de 50-zettenregel telt alleen als het geen mat is (`gameStatus` zet mat ook voorop). Is `halfmoveClock >= 100`, dan is het remise behalve als de speler aan zet schaak staat en geen legale zetten heeft.
   - `src/engine/search-v1.js`: de zoekfunctie van stap 4. Ongewijzigd, behalve dat hij `evaluateMaterial` gebruikt en `MATE`, `isDraw` en `shuffle` uit `common.js` haalt. Zijn tests blijven ongewijzigd slagen.
   - `src/engine/evaluate.js`:
     - `PIECE_VALUES` (ongewijzigd)
@@ -64,6 +64,7 @@
 
 Hulpfunctie in de test: `mirrorFen(fen)` keert de rijen om, wisselt hoofdletters en kleine letters, en wisselt de speler aan zet. Rokade en en passant worden `-`.
 - `evaluateMaterial` geeft de waarden van de tests van stap 4 (die tests verhuizen naar `evaluateMaterial`).
+- In `tests/engine/search-v1.test.js` komt er één test bij: mat op halve zet 100: `'6k1/5ppp/8/8/8/8/8/R5K1 w - - 99 80'`, diepte 3 → `'a1a8'` met `score === MATE − 1` (nu speelt v1 hier een andere zet met score 0).
 - `evaluate(beginstelling) === 0`.
 - Symmetrie: voor de vijf `PERFT_FENS` (zonder rokade/ep): `evaluate(fromFen(fen)) === evaluate(fromFen(mirrorFen(fen)))`.
 - Paard op e4 is beter dan paard op a1: `'4k3/8/8/8/4N3/8/8/4K3 w - - 0 1'` > `'4k3/8/8/8/8/8/8/N3K3 w - - 0 1'`.
@@ -125,8 +126,8 @@ Hulpfunctie in de test: `mirrorFen(fen)` keert de rijen om, wisselt hoofdletters
 - **Mat in 1**: `'6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1'`, `maxDepth: 2` → `'a1a8'`, `score === MATE − 1`.
 - **Mat in 2**, ook via de tabel: `'r1b2k1r/ppp1bppp/8/1B1Q4/5q2/2P5/PPP2PPP/R3R1K1 w - - 0 1'`, `maxDepth: 5` → `'d5d8'` en `score === MATE − 3` (Review Focus 2).
 - **Matdreiging achter de onderste rij** (Review Focus 3): `'4r1k1/5ppp/8/8/8/R7/5PPP/6K1 w - - 0 1'`, `maxDepth: 2`. Na de gekozen zet heeft zwart geen mat in 1. Dat geldt voor 10 seeds; 12 van de 22 zetten zijn hier fout. De engine van stap 4 op diepte 2 ziet dit niet.
-- **Quiescence**: `'4k3/8/2p5/3p4/8/8/8/3QK3 w - - 0 1'`, `maxDepth: 1` → niet `'d1d5'` (v1 slaat hier op diepte 1 wel).
-- **Paardvork**: `'q3k3/8/8/1N6/8/8/8/4K3 w - - 0 1'`, `maxDepth: 4` → `'b5c7'`.
+- **Quiescence**: `'4k3/8/2p5/3p4/8/8/8/3QK3 w - - 0 1'`, `maxDepth: 1` → niet `'d1d5'` (v1 slaat hier op diepte 1 wel), en de score ligt binnen 100 van `+700` (dame tegen twee pionnen).
+- **Paardvork**: `'q3k3/8/8/1N6/8/8/7P/4K3 w - - 0 1'` (met een witte pion op h2, zodat het een echte materiaalwinst is en geen remise door te weinig materiaal), `maxDepth: 4` → `'b5c7'` en `score > 300`.
 - **Promotie**: `'4k3/8/8/8/8/8/p7/4K3 b - - 0 1'`, `maxDepth: 3` → `'a2a1q'`.
 - **Pat vermijden** en **herhaling ontwijken**: dezelfde stellingen en controles als bij v1, met `maxDepth: 3`.
 - **Gewonnen eindspel wordt mat** (Review Focus 2): `'8/8/8/4k3/8/8/8/3QK3 w - - 0 1'` (dame tegen koning). Speel de engine (`timeMs: 100`) tegen zwart, waarbij zwart de zet kiest uit `search` met `maxDepth: 2`. Na hooguit 60 halve zetten is het mat.
@@ -167,7 +168,7 @@ Hulpfunctie in de test: `mirrorFen(fen)` keert de rijen om, wisselt hoofdletters
       - Zonder `noise`: `search(pos, { timeMs: timeMs × timeScale, random })`.
       - Een onbekend niveau → `Error('Onbekend niveau: <n>')`.
   - `src/engine/engine.js`:
-    - `handleRequest({ id, startFen, moves, level, seed?, timeScale? })` gebruikt `chooseMove`
+    - `handleRequest({ id, startFen, moves, level, seed?, timeScale? })` gebruikt `chooseMove`. Uit de review van stap 4: het uitpakken van het verzoek gebeurt binnen de `try`, zodat `handleRequest(undefined)` een `{ id: undefined, error }` geeft en niet gooit
     - het antwoord: `{ id, move, score }`, of `{ id, error }`
     - `positionFromMoves` blijft ongewijzigd
 
@@ -180,7 +181,7 @@ Hulpfunctie in de test: `mirrorFen(fen)` keert de rijen om, wisselt hoofdletters
 - Niveau 1 maakt fouten (Review Focus 4): in de beginstelling, over 50 seeds, kiest niveau 1 minstens 8 verschillende zetten. In `'4k3/8/2p5/3p4/8/8/8/3QK3 w - - 0 1'` slaat niveau 1 over 100 seeds minstens 3 keer de gedekte pion (`'d1d5'`), en niveau 3 nooit.
 - Niveau 4 met `timeScale: 0.1` geeft een legale zet. Niveau 6 en niveau 0 geven de fout `'Onbekend niveau: 6'` en `'Onbekend niveau: 0'`.
 
-`tests/engine/engine.test.js`: de verzoeken gebruiken `level` in plaats van `depth`. Mat in 1 via een verzoek op niveau 5 met `timeScale: 0.05`. Een onbekend niveau geeft `{ id, error: 'Onbekend niveau: 9' }`.
+`tests/engine/engine.test.js`: de verzoeken gebruiken `level` in plaats van `depth`. Mat in 1 via een verzoek op niveau 5 met `timeScale: 0.05`. Een onbekend niveau geeft `{ id, error: 'Onbekend niveau: 9' }`. Een verzoek zonder `level` geeft een fout, en `handleRequest(undefined)` gooit niet maar geeft een `error`.
 
 - [ ] **Stap 2: Draai de tests en zie ze falen** — Run: `npm test`. Expected: FAIL.
 - [ ] **Stap 3: Bouw `levels.js` en pas `engine.js` aan**
@@ -224,6 +225,8 @@ Hulpfunctie in de test: `mirrorFen(fen)` keert de rijen om, wisselt hoofdletters
 | `npm run match -- level:5 level:4 20 0.25 --min 10.5` | niet zwakker; met een kwart van de tijd blijft de verhouding gelijk en duurt het korter |
 
 Noteer alle uitslagen en denktijden in de ledger.
+
+Daarnaast een tijdmeting op drukke stellingen (uit de review van stap 4: de wedstrijd tegen toeval meet alleen rustige stellingen): `chooseMove` voor elk niveau op Kiwipete en pos6 (uit `tests/chess/fixtures.js`), 3 seeds. Expected: niveau 4 en 5 blijven onder hun `timeMs` plus 15%, niveau 1–3 onder 500 ms. Gebruik in het script `WHITE` uit `constants.js` in plaats van `0`.
 
 - [ ] **Stap 3: Koppel in `src/main.js`**
 

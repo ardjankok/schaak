@@ -17,29 +17,44 @@ test('positionFromMoves weigert een illegale zet', () => {
 });
 
 test('handleRequest geeft een legale zet voor de speler aan zet', () => {
-  const request = { id: 7, startFen: START_FEN, moves: ['e2e4'], depth: 2, seed: 3 };
+  const request = { id: 7, startFen: START_FEN, moves: ['e2e4'], level: 2, seed: 3 };
   const answer = handleRequest(request);
   assert.equal(answer.id, 7);
   const legal = generateLegalMoves(positionFromMoves(START_FEN, ['e2e4'])).map(moveToUci);
   assert.ok(legal.includes(answer.move), answer.move);
-  assert.ok(answer.nodes > 0);
   assert.deepEqual(handleRequest(request), answer);
 });
 
 test('handleRequest meldt een illegale zet als fout', () => {
   assert.deepEqual(
-    handleRequest({ id: 8, startFen: START_FEN, moves: ['e2e5'], depth: 2 }),
+    handleRequest({ id: 8, startFen: START_FEN, moves: ['e2e5'], level: 2 }),
     { id: 8, error: 'Ongeldige zet: e2e5' },
   );
 });
 
 test('handleRequest meldt een ongeldige stelling als fout, zonder te gooien', () => {
-  const answer = handleRequest({ id: 9, startFen: 'nonsens', moves: [], depth: 2 });
+  const answer = handleRequest({ id: 9, startFen: 'nonsens', moves: [], level: 2 });
   assert.equal(answer.id, 9);
   assert.match(answer.error, /Ongeldige FEN/);
 });
 
 test('handleRequest vindt mat in 1', () => {
-  const answer = handleRequest({ id: 1, startFen: '6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1', moves: [], depth: 3 });
+  const answer = handleRequest({ id: 1, startFen: '6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1', moves: [], level: 5, timeScale: 0.05 });
   assert.equal(answer.move, 'a1a8');
+});
+
+test('handleRequest meldt een onbekend of ontbrekend niveau als fout', () => {
+  assert.deepEqual(
+    handleRequest({ id: 3, startFen: START_FEN, moves: [], level: 9 }),
+    { id: 3, error: 'Onbekend niveau: 9' },
+  );
+  const answer = handleRequest({ id: 4, startFen: START_FEN, moves: [] });
+  assert.equal(answer.id, 4);
+  assert.ok(answer.error);
+});
+
+test('handleRequest gooit nooit, ook niet zonder verzoek', () => {
+  const answer = handleRequest(undefined);
+  assert.equal(answer.id, undefined);
+  assert.ok(answer.error);
 });

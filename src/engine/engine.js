@@ -1,8 +1,8 @@
-// Vertaalt een verzoek (beginstelling plus gespeelde zetten) naar een zet.
+// Vertaalt een verzoek (beginstelling, gespeelde zetten, niveau) naar een zet.
 // Puur en zonder DOM: de worker en het wedstrijdscript gebruiken dit allebei.
 import { fromFen, makeMove } from '../chess/position.js';
 import { moveFromUci, moveToUci } from '../chess/notation.js';
-import { search } from './search-v1.js';
+import { chooseMove } from './levels.js';
 import { createRandom } from './random.js';
 
 /** De stelling na de gespeelde zetten, met geschiedenis (voor herhaling). */
@@ -17,15 +17,18 @@ export function positionFromMoves(startFen, moves) {
 }
 
 /**
- * @param {{ id: number, startFen: string, moves: string[], depth: number, seed?: number }} request
- * @returns {{ id: number, move: string | null, score: number, nodes: number } | { id: number, error: string }}
+ * Gooit nooit: elke fout wordt een antwoord met `error`.
+ * @param {{ id: number, startFen: string, moves: string[], level: number, seed?: number, timeScale?: number }} request
+ * @returns {{ id: number, move: string | null, score: number } | { id: number, error: string }}
  */
-export function handleRequest({ id, startFen, moves, depth, seed }) {
+export function handleRequest(request) {
+  const id = request?.id;
   try {
+    const { startFen, moves, level, seed, timeScale = 1 } = request;
     const pos = positionFromMoves(startFen, moves);
     const random = seed === undefined ? Math.random : createRandom(seed);
-    const { move, score, nodes } = search(pos, { depth, random });
-    return { id, move: moveToUci(move), score, nodes };
+    const { move, score } = chooseMove(pos, level, { random, timeScale });
+    return { id, move: moveToUci(move), score };
   } catch (error) {
     return { id, error: error.message };
   }

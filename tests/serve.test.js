@@ -1,6 +1,9 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
+import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { createDevServer } from '../scripts/serve.mjs';
 
 const projectRoot = fileURLToPath(new URL('..', import.meta.url));
@@ -35,13 +38,25 @@ test('een onbekend bestand geeft 404', async () => {
   await res.arrayBuffer();
 });
 
-for (const path of ['/..%2Fpackage.json', '/..%5Cpackage.json', '/..%2F..%2Fapp%2Fpackage.json']) {
-  test(`buiten de projectmap komen lukt niet: ${path}`, async () => {
-    const res = await fetch(`${baseUrl}${path}`);
-    assert.ok([403, 404].includes(res.status), `status was ${res.status}`);
-    await res.arrayBuffer();
-  });
-}
+test('bestanden buiten de map worden nooit gegeven', async (t) => {
+  const tmp = await mkdtemp(path.join(os.tmpdir(), 'schaak-serve-'));
+  t.after(() => rm(tmp, { recursive: true, force: true }));
+  await mkdir(path.join(tmp, 'root'));
+  await writeFile(path.join(tmp, 'root', 'index.html'), '<html lang="nl"></html>');
+  await writeFile(path.join(tmp, 'geheim.txt'), 'GEHEIM');
+
+  const fixtureServer = createDevServer(path.join(tmp, 'root'));
+  await new Promise((resolve) => fixtureServer.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise((resolve) => fixtureServer.close(resolve)));
+  const fixtureUrl = `http://127.0.0.1:${fixtureServer.address().port}`;
+
+  for (const attack of ['/..%2Fgeheim.txt', '/..%5Cgeheim.txt', '/%2e%2e%5Cgeheim.txt']) {
+    const res = await fetch(`${fixtureUrl}${attack}`);
+    const body = await res.text();
+    assert.equal(res.status, 403, attack);
+    assert.equal(body.includes('GEHEIM'), false, attack);
+  }
+});
 
 test('een kapotte URL-codering geeft 400 in plaats van een crash', async () => {
   const res = await fetch(`${baseUrl}/%E0%A4%A`);
